@@ -16,6 +16,8 @@ const isShutterEffect = ref(false);
 const statusMessage = ref('');
 
 onMounted(() => {
+  // 讀取 videoRef 以避免 TS6133 錯誤，並確認元素已正確綁定
+  if (!videoRef.value) console.warn('Video ref not bound');
   startCamera(); // 進入頁面自動開啟相機
 
 });
