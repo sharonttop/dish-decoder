@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
 import { useCamera } from '@/composables/useCamera';
+import useTesseract from '@/composables/useTesseract';
 
 const { 
   videoRef, 
@@ -11,6 +12,8 @@ const {
   hasFlash,
   toggleFlash
 } = useCamera();
+
+const { recognizeOCR } = useTesseract();
 
 const isShutterEffect = ref(false);
 const statusMessage = ref('');
@@ -36,6 +39,21 @@ const handleScan = async () => {
     setTimeout(() => statusMessage.value = '', 2000); // 2秒後消失
     // Tesseract Worker
     // recognize(imageBlob);
+    const result = await recognizeOCR(imageBlob, {
+      // rectangle: rectangle,
+      // psm: currentStep.value.ocr.psm,
+      // parameters: currentStep.value.ocr.parameters
+    });
+    // 將結果填入當前步驟的 input
+    if (result) {
+      // steps.value[currentStepIndex.value].value = result;
+      statusMessage.value = `掃描完成: ${result}`;
+      
+      // 若需要自動跳到下一步，可取消註解以下程式碼
+      // if (currentStepIndex.value < steps.value.length - 1) {
+      //   currentStepIndex.value++;
+      // }
+    }
   }
 };
 </script>
