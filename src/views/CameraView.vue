@@ -36,13 +36,17 @@ const handleScan = async () => {
     console.log('截圖成功！Blob 大小:', imageBlob.size);
     // 2. 顯示成功提示
     statusMessage.value = '截圖成功！';
-    setTimeout(() => statusMessage.value = '', 2000); // 2秒後消失
+    // setTimeout(() => statusMessage.value = '', 2000); // 2秒後消失
     // Tesseract Worker
     // recognize(imageBlob);
+    const ocr = {
+      psm: 7, // 7: SINGLE_LINE (單行文字)
+      // parameters: { tessedit_char_whitelist: '0123456789.' }
+    }
     const result = await recognizeOCR(imageBlob, {
       // rectangle: rectangle,
-      // psm: currentStep.value.ocr.psm,
-      // parameters: currentStep.value.ocr.parameters
+      // parameters: ocr.parameters,
+      psm: ocr.psm as any
     });
     // 將結果填入當前步驟的 input
     if (result) {
@@ -56,6 +60,8 @@ const handleScan = async () => {
     }
   }
 };
+
+
 </script>
 
 <template>
@@ -90,6 +96,7 @@ const handleScan = async () => {
     <div class="controls">
       <button v-if="hasFlash" @click="toggleFlash">🔦</button>
       <button class="shutter-btn" @click="handleScan"></button>
+      <button class="shutter-btn" @click="statusMessage = ''">🧽</button>
     </div>
   </div>
 </template>

@@ -11,7 +11,7 @@ interface OCRTaskOptions {
 export default function useTesseract() {
   const { createWorker } = Tesseract
   const loading = ref(false);
-  const SCALE_FACTOR = 2; // 圖片放大倍率，用於提升 OCR 識別率
+  const SCALE_FACTOR = 1; // 圖片放大倍率，用於提升 OCR 識別率
 
   let worker: Tesseract.Worker | null = null;
 
@@ -173,11 +173,28 @@ export default function useTesseract() {
       const oldCanvas = document.getElementById(debugCanvasId);
       if (oldCanvas) oldCanvas.remove();
 
+      // 若有指定辨識範圍 (rectangle)，將其畫在 Debug 圖上
+      const debugCtx = processedImage.getContext('2d');
+      if (debugCtx) {
+        debugCtx.strokeStyle = 'red';
+        debugCtx.lineWidth = 5;
+        for (const task of tasks) {
+          if (task.rectangle) {
+            debugCtx.strokeRect(
+              task.rectangle.left * SCALE_FACTOR,
+              task.rectangle.top * SCALE_FACTOR,
+              task.rectangle.width * SCALE_FACTOR,
+              task.rectangle.height * SCALE_FACTOR
+            );
+          }
+        }
+      }
+
       processedImage.id = debugCanvasId;
       processedImage.style.position = 'fixed';
       processedImage.style.bottom = '20px';
       processedImage.style.right = '20px';
-      processedImage.style.maxWidth = '30%'; // 縮小顯示以免擋住太多畫面
+      processedImage.style.maxWidth = '20%'; // 縮小顯示以免擋住太多畫面
       processedImage.style.zIndex = '9999';
       processedImage.style.border = '2px solid red'; // 加個紅框比較明顯
       document.body.appendChild(processedImage);
@@ -212,6 +229,8 @@ export default function useTesseract() {
           width: rectangle.width * SCALE_FACTOR,
           height: rectangle.height * SCALE_FACTOR
         } : undefined;
+
+        console.log('scaledRectangle',scaledRectangle)
 
         // 使用處理後的圖片進行辨識
         const result = await worker!.recognize(processedImage!, { rectangle: scaledRectangle });

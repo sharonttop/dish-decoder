@@ -91,17 +91,32 @@ export function useCamera(): UseCameraReturn {
     if (!videoRef.value) return null;
 
     const video = videoRef.value;
-    const canvas = document.createElement('canvas');
+
+    // 計算裁切區域以符合螢幕顯示比例 (WYSIWYG)
+    const displayAspect = video.clientWidth / video.clientHeight;
+    const videoAspect = video.videoWidth / video.videoHeight;
     
-    // 設定 Canvas 大小等於影片當下尺寸
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    let sx = 0, sy = 0, sWidth = video.videoWidth, sHeight = video.videoHeight;
+
+    if (videoAspect > displayAspect) {
+      // 影片比螢幕寬 -> 裁切左右
+      sWidth = sHeight * displayAspect;
+      sx = (video.videoWidth - sWidth) / 2;
+    } else {
+      // 影片比螢幕高 -> 裁切上下
+      sHeight = sWidth / displayAspect;
+      sy = (video.videoHeight - sHeight) / 2;
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = sWidth;
+    canvas.height = sHeight;
     
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
 
     // 將當下的 Video Frame 畫到 Canvas 上
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, canvas.width, canvas.height);
 
     return new Promise((resolve) => {
       // 轉成 Blob (image/jpeg, 品質 0.8)
