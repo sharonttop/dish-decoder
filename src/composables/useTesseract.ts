@@ -146,7 +146,7 @@ export default function useTesseract() {
     const tasks: OCRTaskOptions[] = isBatch ? options : [options];
 
     // 2. 決定初始化語言 (若為單一任務且有指定 langs 則使用，否則用預設值)
-    let initLangs: string | string[] = ['eng', 'chi_sim', 'chi_tra']; // chi_sim(簡體中文), chi_tra(繁體中文)
+    let initLangs: string | string[] = ['eng']; // chi_sim(簡體中文), chi_tra(繁體中文)
     if (!isBatch && (options as OCRTaskOptions).langs) {
       initLangs = (options as OCRTaskOptions).langs!;
     } else if (isBatch && tasks.length > 0 && tasks[0]?.langs) {
@@ -236,13 +236,9 @@ export default function useTesseract() {
         const result = await worker!.recognize(processedImage!, { rectangle: scaledRectangle });
         let text = result.data.text; //辨識的值
 
-        if(psm) {
-          // psm模式：垂直單字組合，移除所有空白與換行
-          text = text.replace(/[\n\r\s]/g, ''); 
-        } else {
-          // 一般模式：移除前後空白與結尾的 \n（預設辨識結束自動加上換行符號 (\n) 來表示該行結束）
-          text = text.trim(); 
-        }
+        // 移除前後空白，但保留內容中的空格與換行 (對英文文章至關重要)
+        text = text.trim();
+
         console.log('result',result)
         results.push(text); //批次陣列
       }
