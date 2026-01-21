@@ -156,14 +156,10 @@ const handleScan = async () => {
     const videoAspect = videoWidth / videoHeight;
     
     let blobWidth = videoWidth;
-    let blobHeight = videoHeight;
 
     if (videoAspect > displayAspect) {
       // 影片比螢幕寬 -> 裁切左右 (Blob 高度 = 影片高度)
       blobWidth = videoHeight * displayAspect;
-    } else {
-      // 影片比螢幕高 -> 裁切上下 (Blob 寬度 = 影片寬度)
-      blobHeight = videoWidth / displayAspect;
     }
 
     // 計算螢幕到 Blob 的縮放比例
