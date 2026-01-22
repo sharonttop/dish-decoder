@@ -19,6 +19,10 @@ const isShutterEffect = ref(false);
 const statusMessage = ref('');
 const showResult = ref(false);
 const scanResult = ref('');
+const selectedLang = ref('eng');
+const targetLang = ref('zh-TW');
+const translatedResult = ref('');
+const isTranslating = ref(false);
 
 // --- 動態掃描框邏輯 Start ---
 const overlayRef = ref<HTMLElement | null>(null);
@@ -142,7 +146,7 @@ const handleScan = async () => {
     console.log('截圖成功！Blob 大小:', imageBlob.size);
     // 2. 顯示成功提示
     statusMessage.value = '截圖成功！';
-    // setTimeout(() => statusMessage.value = '', 2000); // 2秒後消失
+    setTimeout(() => statusMessage.value = '', 2000); // 2秒後消失
     // Tesseract Worker
     // recognize(imageBlob);
 
@@ -176,6 +180,7 @@ const handleScan = async () => {
       // parameters: { tessedit_char_whitelist: '0123456789.' }
     }
     const result = await recognizeOCR(imageBlob, {
+      langs: selectedLang.value,
       rectangle: {
         left: rectLeft,
         top: rectTop,
@@ -191,6 +196,7 @@ const handleScan = async () => {
       // statusMessage.value = `掃描完成: ${result}`;
       scanResult.value = Array.isArray(result) ? result.join('\n\n') : result;
       showResult.value = true;
+      translatedResult.value = ''; // 每次新掃描時重置翻譯結果
       
       // 若需要自動跳到下一步，可取消註解以下程式碼
       // if (currentStepIndex.value < steps.value.length - 1) {
@@ -205,10 +211,40 @@ const copyText = () => {
   statusMessage.value = '已複製到剪貼簿';
 };
 
+const translateText = async () => {
+  if (!scanResult.value) return;
+  isTranslating.value = true;
+  
+  // 簡單的語言代碼對應 (Tesseract -> MyMemory)
+  const sourceMap: Record<string, string> = {
+    'eng': 'en',
+    'chi_sim': 'zh-CN',
+    'chi_tra': 'zh-TW'
+  };
+  const source = sourceMap[selectedLang.value] || 'auto';
+  
+  try {
+    // 使用 MyMemory 免費 API (限制：每天 5000 字，僅供測試開發使用)
+    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(scanResult.value)}&langpair=${source}|${targetLang.value}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    translatedResult.value = data.responseData.translatedText;
+  } catch (e) {
+    console.error(e);
+    translatedResult.value = '翻譯失敗，請稍後再試。';
+  } finally {
+    isTranslating.value = false;
+  }
+};
 </script>
 
 <template>
   <div class="camera-container">
+      <select v-model="selectedLang" class="lang-select">
+        <option value="eng">English</option>
+        <option value="chi_sim">简体中文</option>
+        <option value="chi_tra">繁體中文</option>
+      </select>
     <!-- 掃描框 (ROI) -->
     <div class="scan-overlay" ref="overlayRef">
       <div 
@@ -235,6 +271,25 @@ const copyText = () => {
         </div>
         <div class="result-body">
           <pre>{{ scanResult }}</pre>
+          
+          <div class="translation-section">
+            <div class="trans-controls">
+              <label>翻譯成：</label>
+              <select v-model="targetLang" class="trans-select">
+                <option value="zh-TW">繁體中文</option>
+                <option value="en">English</option>
+                <option value="ja">日本語</option>
+                <option value="ko">韓語</option>
+              </select>
+              <button class="trans-btn" @click="translateText" :disabled="isTranslating">
+                {{ isTranslating ? '翻譯中...' : '翻譯' }}
+              </button>
+            </div>
+            <div v-if="translatedResult" class="trans-result">
+              <h4>翻譯結果：</h4>
+              <pre>{{ translatedResult }}</pre>
+            </div>
+          </div>
         </div>
         <div class="result-footer">
           <button class="action-btn" @click="copyText">複製文字</button>
@@ -433,5 +488,68 @@ const copyText = () => {
   border-radius: 6px;
   font-size: 14px;
   cursor: pointer;
+}
+
+.lang-select {
+  position: absolute;
+  right: 1rem;
+  top: 1rem;
+  z-index: 11;
+  color: #ffff;
+  /* height: 40px; */
+  /* align-self: center; */
+  border-radius: 20px;
+  padding: 8px;
+  border: #ffff 2px solid;
+  /* background: rgba(255, 255, 255, 0.9); */
+  font-weight: bold;
+  
+}
+
+.translation-section {
+  margin-top: 20px;
+  padding-top: 15px;
+  border-top: 1px dashed #ccc;
+}
+
+.trans-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  font-size: 14px;
+  color: #333;
+}
+
+.trans-select {
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+}
+
+.trans-btn {
+  padding: 4px 12px;
+  background: #4a90e2;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.trans-btn:disabled {
+  background: #ccc;
+}
+
+.trans-result h4 {
+  margin: 0 0 5px 0;
+  font-size: 14px;
+  color: #666;
+}
+
+.trans-result pre {
+  background: #eef;
+  padding: 10px;
+  border-radius: 6px;
+  color: #333;
 }
 </style>

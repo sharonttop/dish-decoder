@@ -14,12 +14,14 @@ export default function useTesseract() {
   const SCALE_FACTOR = 1; // 圖片放大倍率，用於提升 OCR 識別率
 
   let worker: Tesseract.Worker | null = null;
+  let currentWorkerLangs: string | string[] | null = null;
 
   // 手動釋放 Worker 資源
   const terminate = async () => {
     if (worker) {
       await worker.terminate();
       worker = null;
+      currentWorkerLangs = null;
       //手動釋放組件
     }
     loading.value = false;
@@ -146,7 +148,7 @@ export default function useTesseract() {
     const tasks: OCRTaskOptions[] = isBatch ? options : [options];
 
     // 2. 決定初始化語言 (若為單一任務且有指定 langs 則使用，否則用預設值)
-    let initLangs: string | string[] = ['eng']; // chi_sim(簡體中文), chi_tra(繁體中文)
+    let initLangs: string | string[] = 'eng';
     if (!isBatch && (options as OCRTaskOptions).langs) {
       initLangs = (options as OCRTaskOptions).langs!;
     } else if (isBatch && tasks.length > 0 && tasks[0]?.langs) {
@@ -157,11 +159,17 @@ export default function useTesseract() {
     let processedImage: HTMLCanvasElement | null = null;
 
     try {
+      // 檢查是否需要切換語言 (若 worker 已存在但語言不同，則重建)
+      if (worker && JSON.stringify(currentWorkerLangs) !== JSON.stringify(initLangs)) {
+        await terminate();
+      }
+
       // 如果 worker 尚未建立，則初始化 (重複使用 worker 以提升效能)
       if (!worker) {
         worker = await createWorker(initLangs, 1, {
           logger: (m: any) => console.log('logger', m),
         });
+        currentWorkerLangs = initLangs;
       }
       
       // 執行影像前處理 (亮度偵測、二值化)
