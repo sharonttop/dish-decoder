@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, reactive } from 'vue';
 import { useCamera } from '@/composables/useCamera';
-import useTesseract from '@/composables/useTesseract';
+import { useGemini } from '../composables/useGemini';
 
 const { 
   videoRef, 
@@ -13,7 +13,7 @@ const {
   toggleFlash
 } = useCamera();
 
-const { recognizeOCR } = useTesseract();
+const { recognizeWithGemini, translateWithGemini, loading: isRecognizing } = useGemini();
 
 const isShutterEffect = ref(false);
 const statusMessage = ref('');
@@ -175,20 +175,15 @@ const handleScan = async () => {
     const rectLeft = box.x * scale;
     const rectTop = box.y * scale;
 
-    const ocr = {
-      psm: 3, // 3: AUTO (自動分頁，適合整張菜單或多行文字)
-      // parameters: { tessedit_char_whitelist: '0123456789.' }
-    }
-    const result = await recognizeOCR(imageBlob, {
-      langs: selectedLang.value,
-      rectangle: {
+    // 使用 Gemini 進行辨識
+    const result = await recognizeWithGemini(imageBlob, {
+      lang: selectedLang.value,
+      rect: {
         left: rectLeft,
         top: rectTop,
         width: rectWidth,
         height: rectHeight
-      },
-      // parameters: ocr.parameters,
-      psm: ocr.psm as any
+      }
     });
     // 將結果填入當前步驟的 input
     if (result) {
@@ -196,12 +191,7 @@ const handleScan = async () => {
       // statusMessage.value = `掃描完成: ${result}`;
       scanResult.value = Array.isArray(result) ? result.join('\n\n') : result;
       showResult.value = true;
-      translatedResult.value = ''; // 每次新掃描時重置翻譯結果
-      
-      // 若需要自動跳到下一步，可取消註解以下程式碼
-      // if (currentStepIndex.value < steps.value.length - 1) {
-      //   currentStepIndex.value++;
-      // }
+      translatedResult.value = '';
     }
   }
 };
@@ -215,26 +205,18 @@ const translateText = async () => {
   if (!scanResult.value) return;
   isTranslating.value = true;
   
-  // 簡單的語言代碼對應 (Tesseract -> MyMemory)
-  const sourceMap: Record<string, string> = {
-    'eng': 'en',
-    'chi_sim': 'zh-CN',
-    'chi_tra': 'zh-TW'
+  // 語言代碼對應 (轉為 AI 易懂的名稱)
+  const langMap: Record<string, string> = {
+    'zh-TW': 'Traditional Chinese',
+    'en': 'English',
+    'ja': 'Japanese',
+    'ko': 'Korean'
   };
-  const source = sourceMap[selectedLang.value] || 'auto';
+  const target = langMap[targetLang.value] || targetLang.value;
   
-  try {
-    // 使用 MyMemory 免費 API (限制：每天 5000 字，僅供測試開發使用)
-    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(scanResult.value)}&langpair=${source}|${targetLang.value}`;
-    const res = await fetch(url);
-    const data = await res.json();
-    translatedResult.value = data.responseData.translatedText;
-  } catch (e) {
-    console.error(e);
-    translatedResult.value = '翻譯失敗，請稍後再試。';
-  } finally {
-    isTranslating.value = false;
-  }
+  const result = await translateWithGemini(scanResult.value, target);
+  translatedResult.value = result || '翻譯失敗，請稍後再試。';
+  isTranslating.value = false;
 };
 </script>
 
@@ -312,8 +294,8 @@ const translateText = async () => {
       <button @click="startCamera">重試</button>
     </div>
 
-    <div v-if="isLoading" class="loading">
-      相機啟動中...
+    <div v-if="isLoading || isRecognizing" class="loading">
+      {{ isRecognizing ? 'AI 辨識中...' : '相機啟動中...' }}
     </div>
 
     <video 
@@ -452,6 +434,7 @@ const translateText = async () => {
   overflow-y: auto; /* 內容過長時可捲動 */
   flex: 1;
   background: #f9f9f9;
+  text-align: start;
 }
 
 .result-body pre {
